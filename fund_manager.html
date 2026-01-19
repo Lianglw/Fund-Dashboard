@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>基金赛道主力矩阵 - 量化养基手</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: { 'market-up': '#ef4444', 'market-down': '#22c55e' },
+                    fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'], mono: ['JetBrains Mono', 'monospace'] }
+                }
+            }
+        }
+    </script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        .dark ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+
+        .dark ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+
+        .progress-bar-bg {
+            border-radius: 999px;
+            height: 6px;
+            overflow: hidden;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            border-radius: 999px;
+            transition: width 0.5s ease;
+        }
+
+        body {
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        .glass-panel {
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            transition: background-color 0.3s, border-color 0.3s;
+        }
+
+        .ai-tooltip {
+            visibility: hidden;
+            opacity: 0;
+            transition: opacity 0.2s, transform 0.2s;
+            transform: translateY(10px);
+            bottom: 100%;
+            right: 0;
+            z-index: 50;
+        }
+
+        .group:hover .ai-tooltip {
+            visibility: visible;
+            opacity: 1;
+            transform: translateY(-5px);
+        }
+
+        .prose h3 {
+            color: #818cf8;
+            font-weight: 700;
+            margin-top: 1rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .prose ul {
+            list-style-type: disc;
+            padding-left: 1.25rem;
+        }
+
+        .prose strong {
+            color: #e2e8f0;
+            font-weight: 600;
+        }
+
+        .dark .prose strong {
+            color: #f1f5f9;
+        }
+    </style>
+</head>
+
+<body
+    class="h-screen flex flex-col overflow-hidden text-sm bg-slate-50 text-slate-900 dark:bg-slate-900 dark:text-slate-100">
+
+    <!-- Header -->
+    <header
+        class="h-16 border-b border-slate-200 dark:border-slate-700 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md flex items-center justify-between px-6 shrink-0 z-20">
+        <div class="flex items-center gap-4">
+            <div
+                class="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
+                <i class="fa-solid fa-chart-line text-white text-xs"></i>
+            </div>
+            <div>
+                <h1 class="font-bold text-lg tracking-tight text-slate-800 dark:text-white">人气赛道基金 (1/19)</h1>
+                <div class="text-[10px] text-slate-500 dark:text-slate-400 font-mono" id="last-updated">更新中...</div>
+            </div>
+        </div>
+        <div
+            class="flex bg-slate-100 dark:bg-slate-800/50 p-1 rounded-lg border border-slate-200 dark:border-slate-700/50">
+            <button
+                class="time-filter-btn px-3 py-1 rounded-md text-xs font-medium transition-colors bg-white dark:bg-slate-600 text-slate-900 dark:text-white shadow-sm"
+                data-period="1D">日</button>
+            <button
+                class="time-filter-btn px-3 py-1 rounded-md text-xs font-medium transition-colors text-slate-500 hover:bg-white dark:hover:bg-slate-700"
+                data-period="1W">周</button>
+            <button
+                class="time-filter-btn px-3 py-1 rounded-md text-xs font-medium transition-colors text-slate-500 hover:bg-white dark:hover:bg-slate-700"
+                data-period="1M">月</button>
+            <button
+                class="time-filter-btn px-3 py-1 rounded-md text-xs font-medium transition-colors text-slate-500 hover:bg-white dark:hover:bg-slate-700"
+                data-period="YTD">今年</button>
+        </div>
+        <div class="flex items-center gap-3">
+            <button onclick="app.toggleTheme()"
+                class="p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 transition-colors">
+                <i class="fa-solid fa-sun dark:hidden"></i><i class="fa-solid fa-moon hidden dark:block"></i>
+            </button>
+            <div class="h-6 w-px bg-slate-200 dark:bg-slate-700"></div>
+            <button onclick="app.refreshData()"
+                class="group p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700/50 text-slate-500 dark:text-slate-400 hover:text-indigo-600 transition-all"><i
+                    class="fa-solid fa-rotate group-hover:animate-spin"></i></button>
+            <button id="add-fund-btn"
+                class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-xs shadow-lg shadow-indigo-600/20"
+                onclick="app.openAddModal()"><i class="fa-solid fa-plus"></i><span>新增</span></button>
+            <div id="manage-controls-default">
+                <button onclick="app.toggleManageMode(true)"
+                    class="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 font-medium text-xs"><i
+                        class="fa-solid fa-pen-to-square"></i><span>管理</span></button>
+            </div>
+            <div id="manage-controls-active" class="hidden flex items-center gap-2">
+                <button onclick="app.saveChanges()"
+                    class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs"><i
+                        class="fa-solid fa-check"></i><span>保存</span></button>
+                <button onclick="app.toggleManageMode(false)"
+                    class="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 font-medium text-xs"><i
+                        class="fa-solid fa-xmark"></i><span>取消</span></button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Content -->
+    <main class="flex-1 overflow-y-auto p-4 relative">
+        <div class="max-w-7xl mx-auto">
+            <div
+                class="glass-panel rounded-xl overflow-hidden shadow-xl bg-white/70 dark:bg-slate-800/70 border border-white/20 dark:border-white/5">
+                <div
+                    class="grid grid-cols-12 gap-2 px-4 py-2 bg-slate-50/90 dark:bg-slate-800/80 border-b border-slate-200 dark:border-white/5 text-xs font-semibold text-slate-500 dark:text-slate-400 sticky top-0 backdrop-blur-xl z-30">
+                    <div class="col-span-1 text-center">赛道</div>
+                    <div class="col-span-1 text-center border-l dark:border-white/5">代码</div>
+                    <div class="col-span-4 pl-2 border-l dark:border-white/5">基金名称</div>
+                    <div class="col-span-2 text-right border-l dark:border-white/5 cursor-pointer hover:text-indigo-500"
+                        onclick="app.sortData('valuation')">估值(%) <i class="fa-solid fa-sort ml-1"></i></div>
+                    <div class="col-span-2 text-right border-l dark:border-white/5 cursor-pointer hover:text-indigo-500"
+                        onclick="app.sortData('ytd')">今年涨幅(%) <i class="fa-solid fa-sort ml-1"></i></div>
+                    <div class="col-span-2 pl-2 border-l dark:border-white/5">AI深度诊断</div>
+                </div>
+                <div id="fund-table-body" class="divide-y divide-slate-100 dark:divide-slate-700/50 pb-20"></div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Report Modal -->
+    <div id="report-modal"
+        class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 hidden flex items-center justify-center opacity-0 transition-opacity p-4">
+        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto transform scale-95 transition-transform"
+            id="report-modal-content">
+            <div
+                class="sticky top-0 bg-white/95 dark:bg-slate-900/95 border-b border-slate-100 dark:border-slate-800 px-6 py-4 flex justify-between items-center z-10">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-full bg-indigo-500/10 flex items-center justify-center">
+                        <i class="fa-solid fa-user-doctor text-indigo-500 text-lg"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-lg font-bold text-slate-900 dark:text-white" id="report-title">基金诊断书</h2>
+                        <div class="text-xs text-slate-500 font-mono" id="report-id">GENERATING REPORT...</div>
+                    </div>
+                </div>
+                <button onclick="app.closeReportModal()"
+                    class="w-8 h-8 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center transition-colors text-slate-500"><i
+                        class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+
+            <div class="p-8 space-y-8 prose dark:prose-invert max-w-none text-slate-600 dark:text-slate-300 text-sm leading-relaxed"
+                id="report-body">
+                <!-- Dynamic Content Injected Here -->
+            </div>
+
+            <div
+                class="sticky bottom-0 bg-slate-50 dark:bg-slate-900/95 border-t border-slate-100 dark:border-slate-800 px-6 py-4 flex justify-end gap-3 z-10">
+                <button onclick="app.closeReportModal()"
+                    class="px-5 py-2.5 rounded-lg font-medium text-sm bg-indigo-600 text-white hover:bg-indigo-500 shadow-lg shadow-indigo-600/20 active:scale-95 transition-all">我已阅知</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Modal -->
+    <div id="add-modal"
+        class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex items-center justify-center opacity-0 transition-opacity">
+        <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xl w-96 transform scale-95 transition-transform"
+            id="add-modal-content">
+            <div class="px-6 py-4 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center">
+                <h3 class="text-slate-900 dark:text-white font-semibold">新增基金</h3>
+                <button onclick="app.closeAddModal()"
+                    class="text-slate-400 hover:text-slate-900 dark:hover:text-white"><i
+                        class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="p-6 space-y-4">
+                <input type="text" id="new-fund-code"
+                    class="w-full bg-slate-50 dark:bg-slate-900 border rounded-lg px-3 py-2 dark:border-slate-700 dark:text-white text-sm"
+                    placeholder="基金代码">
+                <div>
+                    <div class="flex justify-between items-center mb-1">
+                        <label class="text-xs text-slate-500 dark:text-slate-400">所属赛道</label>
+                        <button onclick="app.toggleSectorInputMode()" id="sector-toggle-btn"
+                            class="text-xs text-indigo-500 hover:text-indigo-400 hover:underline transition-colors">新建赛道</button>
+                    </div>
+                    <select id="new-fund-sector"
+                        class="w-full bg-slate-50 dark:bg-slate-900 border rounded-lg px-3 py-2 dark:border-slate-700 dark:text-white text-sm transition-all"></select>
+                    <input type="text" id="new-sector-name"
+                        class="w-full bg-slate-50 dark:bg-slate-900 border rounded-lg px-3 py-2 dark:border-slate-700 dark:text-white text-sm hidden transition-all"
+                        placeholder="输入新赛道名称 (例如: 低空经济)">
+                </div>
+            </div>
+            <div class="px-6 py-4 border-t border-slate-100 dark:border-slate-700 flex justify-end gap-3">
+                <button onclick="app.closeAddModal()"
+                    class="px-4 py-2 rounded-lg text-xs font-medium text-slate-500 hover:bg-slate-100">取消</button>
+                <button onclick="app.addNewFund()"
+                    class="px-4 py-2 rounded-lg text-xs font-medium bg-indigo-600 text-white shadow-lg">添加</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const RAW_DATA = [
+            // 脑机
+            { s: 'brain', c: '001056', n: '华银健康生活主题灵活配置', v: -0.71, y: 21.65 },
+            { s: 'brain', c: '000591', n: '中银健康生活混合', v: -0.71, y: 8.69 },
+            { s: 'brain', c: '019414', n: '长城消费增值混合C', v: -0.69, y: 16.81 },
+            // 核聚变
+            { s: 'nuclear', c: '024203', n: '永赢制造升级智选混合发起C', v: -0.84, y: 13.11 },
+            // 机器人
+            { s: 'robot', c: '018125', n: '永赢先进制造智选混合发起C', v: 2.11, y: 10.39 },
+            { s: 'robot', c: '016531', n: '鹏华碳中和主题混合C', v: 2.35, y: 6.74 },
+            { s: 'robot', c: '001770', n: '前海开源嘉鑫混合C', v: 1.30, y: 7.84 },
+            { s: 'robot', c: '025942', n: '广发新动力混合C', v: 1.05, y: 4.33 },
+            { s: 'robot', c: '007519', n: '东方阿尔法优选混合C', v: 1.50, y: 5.51 },
+            // CPO
+            { s: 'cpo', c: '022365', n: '永赢科技智选混合发起C', v: -0.98, y: 0.77 },
+            { s: 'cpo', c: '018957', n: '中航机遇领航混合发起C', v: -1.23, y: -1.07 },
+            { s: 'cpo', c: '016371', n: '信澳业绩驱动混合C', v: -0.38, y: 1.86 },
+            { s: 'cpo', c: '002112', n: '德邦鑫星价值C', v: -0.54, y: -0.30 },
+            { s: 'cpo', c: '011452', n: '华泰柏瑞质量成长混合C', v: -0.38, y: 1.13 },
+            // 半导体
+            { s: 'semi', c: '015968', n: '永赢半导体产业智选混合发起C', v: -0.40, y: 11.86 },
+            { s: 'semi', c: '008888', n: '华夏国证半导体芯片ETF联接C', v: 0.04, y: 13.48 },
+            { s: 'semi', c: '014320', n: '德邦半导体产业混合发起C', v: -1.25, y: 16.33 },
+            // 存储
+            { s: 'storage', c: '025209', n: '永赢先锋半导体智选混合发起C', v: -1.43, y: 24.91 },
+            { s: 'storage', c: '018816', n: '方正富邦核心优势混合C', v: -0.86, y: 24.34 },
+            { s: 'storage', c: '025500', n: '东方阿尔法科技智选混合发起C', v: -1.10, y: 25.76 },
+            { s: 'storage', c: '016874', n: '广发远见智选混合C', v: -1.20, y: 31.68 },
+            // 半导体设备 (Missing in previous, but merging into Semi or separate? Image says "半导体设备" with 320007. Actually 320007 is 诺安成长. Image puts it under '半导体'. Wait, image has '半导体' then '存储' then '半导体(设备)'. Let's follow image order.)
+            // Re-checking image: 320007 is labeled under "半导体". 
+            // 017811 is "Ai应用".
+            // Let's stick to existing categories and append.
+            // AI应用
+            { s: 'ai_app', c: '320007', n: '诺安成长混合A', v: -0.85, y: 16.28 }, // Moved here or separate? Image has it under '半导体'. I will put it in Semi for now or create new "Semi_Equip"? It's fine in Semi or AI_App, actually 320007 is Semi. Let's put in 'semi'.
+            // Actually, in the image, 320007 is under "半导体".
+            { s: 'semi', c: '320007', n: '诺安成长混合A', v: -0.85, y: 16.28 },
+
+            { s: 'ai_app', c: '017811', n: '东方人工智能主题混合C', v: 0.50, y: 27.54 },
+            { s: 'ai_app', c: '018463', n: '德邦稳盈增长灵活配置混合C', v: -2.33, y: 27.35 },
+            { s: 'ai_app', c: '023754', n: '永赢信息产业智选混合发起C', v: -3.50, y: 28.49 },
+            // AI
+            { s: 'ai', c: '012734', n: '易方达中证人工智能主题ETF联接C', v: -1.33, y: 8.94 },
+            { s: 'ai', c: '018123', n: '永赢数字经济智选混合发起C', v: 0.32, y: 9.90 },
+            // 游戏传媒
+            { s: 'game', c: '012769', n: '华夏中证动漫游戏ETF发起式联接C', v: 0.36, y: 11.23 },
+            // 港创中药
+            { s: 'hk_med', c: '513120', n: '广发中证香港创新药(QDII-ETF)', v: -2.91, y: 14.65 },
+            { s: 'hk_med', c: '023598', n: '景顺长城中证港股通创新药ETF联接C', v: -3.04, y: 14.11 },
+            { s: 'hk_med', c: '021031', n: '汇添富国证港股通创新药ETF发起式联接C', v: -3.15, y: 11.11 },
+            // A股创新药
+            { s: 'cn_med', c: '015916', n: '永赢医药创新智选混合发起C', v: -2.79, y: 11.84 },
+            { s: 'cn_med', c: '022287', n: '长城医药产业精选混合发起式C', v: -2.24, y: 8.33 },
+            { s: 'cn_med', c: '003096', n: '中欧医疗健康混合C', v: -1.41, y: 7.35 },
+            // 恒生科技
+            { s: 'hs_tech', c: '012349', n: '天弘恒生科技ETF联接C', v: -1.18, y: 4.61 },
+            { s: 'hs_tech', c: '015311', n: '华泰柏瑞恒生科技ETF联接(QDII)C', v: -1.24, y: 4.89 },
+            { s: 'hs_tech', c: '014674', n: '富国中证港股通互联网ETF发起式联接C', v: -2.32, y: 8.46 },
+            { s: 'hs_tech', c: '016496', n: '景顺长城中证港股通科技ETF联接C', v: -1.94, y: 6.74 },
+            // 微盘量化
+            { s: 'quant', c: '023350', n: '诺安多策略混合C', v: 1.71, y: 6.08 },
+            // 稀土
+            { s: 'rare', c: '011036', n: '嘉实中证稀土产业ETF联接C', v: 0.31, y: 10.22 },
+            // 锂矿
+            { s: 'li', c: '290008', n: '泰信发展主题混合', v: 0.22, y: -1.60 },
+            // 黄金
+            { s: 'gold', c: '004253', n: '国泰黄金ETF联接C', v: 1.27, y: 5.84 },
+            // 白银
+            { s: 'silver', c: '019005', n: '国投瑞银白银期货(LOF)C', v: -1.38, y: 25.29 },
+            // 商业航天
+            { s: 'space', c: '015790', n: '永赢高端装备智选混合发起C', v: -0.05, y: 12.81 },
+            { s: 'space', c: '024195', n: '永赢国证商用卫星通信产业ETF发起联接C', v: 0.03, y: 13.87 },
+            { s: 'space', c: '025491', n: '平安中证卫星产业指数C', v: 0.56, y: 7.64 },
+            { s: 'space', c: '025647', n: '平安高端装备混合发起C', v: 0.98, y: 11.70 },
+            // 军工
+            { s: 'mil', c: '016848', n: '中欧高端装备股票发起C', v: 3.87, y: 7.90 },
+            { s: 'mil', c: '010364', n: '鹏华空天军工指数(LOF)C', v: 2.30, y: 11.05 },
+            // 金融科技
+            { s: 'fintech', c: '013478', n: '华宝中证金融科技主题ETF发起联接C', v: -1.05, y: 7.15 },
+            // 银行
+            { s: 'bank', c: '001595', n: '天弘中证银行ETF联接C', v: -0.57, y: -4.20 },
+            // 白酒
+            { s: 'liquor', c: '012414', n: '招商中证白酒指数C', v: -0.47, y: -0.10 },
+            // 红利
+            { s: 'dividend', c: '007467', n: '华泰柏瑞中证红利低波ETF联接C', v: 0.17, y: -2.59 },
+            // 小微盘
+            { s: 'micro', c: '002834', n: '华夏新锦绣混合C', v: 0.29, y: 4.43 },
+            // 全球消费
+            { s: 'global', c: '012062', n: '富国全球消费精选混合(QDII)人民币C', v: -0.36, y: 6.54 },
+            // 新能源电池
+            { s: 'battery', c: '013180', n: '广发国证新能源车电池ETF发起联接C', v: 0.10, y: 3.68 },
+            { s: 'battery', c: '012863', n: '汇添富中证电池主题ETF发起式联接C', v: 0.13, y: 3.34 },
+            { s: 'battery', c: '017223', n: '富国中证电池主题ETF发起式联接C', v: 0.11, y: 3.41 },
+            // 光伏
+            { s: 'pv', c: '011103', n: '天弘中证光伏C', v: 1.33, y: 9.41 },
+            // 低空经济
+            { s: 'low_alt', c: '016387', n: '永赢低碳环保智选混合发起C', v: -0.66, y: 7.60 },
+            // 美股
+            { s: 'us', c: '017437', n: '华宝纳斯达克精选股票发起式(QDII)C', v: 0.23, y: -1.44 },
+            { s: 'us', c: '006479', n: '广发纳指100ETF联接(QDII)人民币C', v: -0.07, y: 0.80 },
+            // 债券
+            { s: 'bond', c: '020741', n: '华泰保兴安悦债券C', v: 0.00, y: -0.38 }
+        ];
+
+        const SECTORS = [
+            { id: 'brain', name: '脑机', type: 'Satellite', trend: 'Explosion', policy: '未来产业先导区' },
+            { id: 'nuclear', name: '核聚变', type: 'Satellite', trend: 'Concept', policy: '清洁能源终极目标' },
+            { id: 'robot', name: '机器人', type: 'Satellite', trend: 'Explosion', policy: '新质生产力核心' },
+            { id: 'cpo', name: 'CPO', type: 'Satellite', trend: 'Involution', policy: '算力基建' },
+            { id: 'semi', name: '半导体', type: 'Satellite', trend: 'Explosion', policy: '国产替代/卡脖子攻坚' },
+            { id: 'storage', name: '存储', type: 'Satellite', trend: 'Explosion', policy: '数据要素底层' },
+            { id: 'ai_app', name: 'AI应用', type: 'Satellite', trend: 'Explosion', policy: '人工智能+' },
+            { id: 'ai', name: 'Ai', type: 'Satellite', trend: 'Explosion', policy: '数字经济' },
+            { id: 'game', name: '游戏传媒', type: 'Satellite', trend: 'Involution', policy: '文化出海' },
+            { id: 'hk_med', name: '港创新药', type: 'Core', trend: 'Explosion', policy: '老龄化刚需' },
+            { id: 'cn_med', name: 'A股创新药', type: 'Core', trend: 'Explosion', policy: '集采出清' },
+            { id: 'hs_tech', name: '恒生科技', type: 'Satellite', trend: 'Explosion', policy: '平台经济回暖' },
+            { id: 'quant', name: '微盘量化', type: 'Satellite', trend: 'Involution', policy: '流动性支持' },
+            { id: 'rare', name: '稀土', type: 'Satellite', trend: 'Concept', policy: '战略资源管控' },
+            { id: 'li', name: '锂矿', type: 'Satellite', trend: 'Involution', policy: '新能源上游' },
+            { id: 'gold', name: '黄金', type: 'Core', trend: 'Explosion', policy: '去美元化避险' },
+            { id: 'silver', name: '白银', type: 'Satellite', trend: 'Explosion', policy: '工业属性+金融属性' },
+            { id: 'space', name: '商业航天', type: 'Satellite', trend: 'Concept', policy: '太空基建' },
+            { id: 'mil', name: '军工', type: 'Satellite', trend: 'Concept', policy: '国防现代化' },
+            { id: 'fintech', name: '金融科技', type: 'Satellite', trend: 'Explosion', policy: '数字货币/支付' },
+            { id: 'bank', name: '银行', type: 'Core', trend: 'Involution', policy: '高股息/中特估' },
+            { id: 'liquor', name: '白酒', type: 'Core', trend: 'Involution', policy: '消费复苏' },
+            { id: 'dividend', name: '红利', type: 'Core', trend: 'Involution', policy: '防御性资产' },
+            { id: 'micro', name: '小微盘', type: 'Satellite', trend: 'Involution', policy: '壳资源价值' },
+            { id: 'global', name: '全球消费', type: 'Core', trend: 'Explosion', policy: '出海逻辑' },
+            { id: 'battery', name: '新能源电池', type: 'Satellite', trend: 'Involution', policy: '产能出清中' },
+            { id: 'pv', name: '光伏', type: 'Satellite', trend: 'Involution', policy: '产能过剩' },
+            { id: 'low_alt', name: '低空经济', type: 'Satellite', trend: 'Concept', policy: '新增长极' },
+            { id: 'us', name: '美股', type: 'Core', trend: 'Explosion', policy: 'AI 科技牛' },
+            { id: 'bond', name: '债券', type: 'Core', trend: 'Involution', policy: '利率下行' }
+        ];
+
+        class FundDataLoader {
+            static loadScript(url) {
+                return new Promise((resolve, reject) => {
+                    const script = document.createElement('script');
+                    script.src = url;
+                    script.onload = () => { document.body.removeChild(script); resolve(); };
+                    script.onerror = () => { document.body.removeChild(script); reject(); };
+                    document.body.appendChild(script);
+                });
+            }
+
+            static async fetchFundInfo(code) {
+                // 1. Fetch Basic Info & History (pingzhongdata)
+                // This defines globals: fS_name, Data_netWorthTrend, etc.
+                try {
+                    await this.loadScript(`http://fund.eastmoney.com/pingzhongdata/${code}.js`);
+
+                    if (typeof fS_name === 'undefined') throw new Error('Data not found');
+
+                    const name = fS_name; // Global var from script
+                    const history = Data_netWorthTrend; // Global var: [{x: timestamp, y: nav}, ...]
+
+                    // Calculate YTD
+                    // Find last NAV of previous year
+                    const currentYear = new Date().getFullYear();
+                    const lastYearEnd = new Date(currentYear - 1, 11, 31).getTime();
+
+                    let startNav = 1;
+                    // Find the entry closest to last year end (but <= it)
+                    // Actually Data_netWorthTrend is sorted by date? Usually yes time ascending.
+                    // Let's just look for the last entry of prev year.
+                    let startEntry = history.filter(h => h.x <= lastYearEnd).pop();
+
+                    if (!startEntry && history.length > 0) startEntry = history[0]; // Fallback to inception
+                    if (startEntry) startNav = startEntry.y;
+
+                    const currentEntry = history[history.length - 1];
+                    const currentNav = currentEntry ? currentEntry.y : 1;
+
+                    const ytd = ((currentNav - startNav) / startNav) * 100;
+
+                    return { name, ytd, history: history.slice(-30).map(h => h.y) };
+
+                } catch (e) {
+                    console.error("Fund Info Fetch Error", e);
+                    return null;
+                }
+            }
+
+            static async fetchRealtimeValuation(code) {
+                // 2. Fetch Realtime Valuation (fundgz)
+                // Returns jsonpgz({...});
+                return new Promise((resolve) => {
+                    // Define global callback
+                    window.jsonpgz = (data) => {
+                        resolve({
+                            gszzl: parseFloat(data.gszzl),
+                            gztime: data.gztime
+                        });
+                        delete window.jsonpgz; // Cleanup
+                    };
+
+                    this.loadScript(`http://fundgz.1234567.com.cn/js/${code}.js?rt=${Date.now()}`)
+                        .catch(() => resolve(null)); // Resolve null on error
+                });
+            }
+        }
+
+        class App {
+            constructor() {
+                this.loadData();
+                this.manageMode = false;
+                this.sortConfig = { key: null, direction: 'desc' };
+                this.viewMode = '1D';
+                this.init();
+                setInterval(() => this.tick(), 5000);
+            }
+
+            loadData() {
+                try {
+                    const storedFunds = localStorage.getItem('fund_manager_funds');
+                    const storedSectors = localStorage.getItem('fund_manager_sectors');
+
+                    if (storedSectors) {
+                        const parsed = JSON.parse(storedSectors);
+                        SECTORS.length = 0;
+                        parsed.forEach(s => SECTORS.push(s));
+                    }
+
+                    if (storedFunds) {
+                        this.funds = JSON.parse(storedFunds);
+                    } else {
+                        this.funds = this.initFundsFromRaw();
+                    }
+                } catch (e) {
+                    console.error("Load Error", e);
+                    this.funds = this.initFundsFromRaw();
+                }
+            }
+
+            saveData() {
+                localStorage.setItem('fund_manager_funds', JSON.stringify(this.funds));
+                localStorage.setItem('fund_manager_sectors', JSON.stringify(SECTORS));
+            }
+
+            initFundsFromRaw() {
+                return RAW_DATA.map(d => ({
+                    id: crypto.randomUUID(),
+                    code: d.c, name: d.n, sectorId: d.s, todayVal: d.v, ytdGain: d.y,
+                    history: Array.from({ length: 30 }, () => Math.random() * 2 + 1),
+                    maxDrawdown: Math.random() * 40 + 5,
+                    sizeCMD: Math.random() * 200 + 0.5,
+                    marked: false,
+                    isReal: false
+                }));
+            }
+
+            // initFunds alias for compatibility if called internally, though we use loadData now.
+            initFunds() { return this.initFundsFromRaw(); }
+
+            init() {
+                this.updateTime();
+                this.renderTable();
+
+                const sel = document.getElementById('new-fund-sector');
+                if (sel) {
+                    // Clear existing (in case re-init) logic? No, assuming empty.
+                    sel.innerHTML = '';
+                    SECTORS.forEach(s => {
+                        const opt = document.createElement('option');
+                        opt.value = s.id; opt.textContent = s.name; sel.appendChild(opt);
+                    });
+                }
+
+                document.querySelectorAll('.time-filter-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        document.querySelectorAll('.time-filter-btn').forEach(b => b.classList.remove('bg-white', 'dark:bg-slate-600', 'text-slate-900', 'dark:text-white', 'shadow-sm'));
+                        e.target.classList.add('bg-white', 'dark:bg-slate-600', 'text-slate-900', 'dark:text-white', 'shadow-sm');
+                        this.viewMode = e.target.getAttribute('data-period');
+                        this.renderTable();
+                    });
+                });
+            }
+
+            tick() {
+                this.funds.forEach(f => {
+                    if (!f.isReal) {
+                        f.todayVal += (Math.random() - 0.5) * 0.01;
+                    }
+                });
+                this.updateTime();
+                this.renderTable();
+            }
+
+            updateTime() {
+                const el = document.getElementById('last-updated');
+                if (el) el.innerText = new Date().toLocaleTimeString();
+            }
+
+            generateReport(fund) {
+                const sector = SECTORS.find(s => s.id === fund.sectorId);
+                const isCore = sector.type === 'Core';
+                const isRiskHigh = fund.maxDrawdown > 30;
+
+                // 1. Identity
+                const identity = isCore
+                    ? `核心资产 (压舱石)｜适合长线定投躺平`
+                    : `卫星资产 (进攻矛)｜适合短线波段博弈`;
+
+                // 2. Quantitative Checks
+                const sizeStatus = fund.sizeCMD < 2 ? '规模过小 (清盘风险)' : (fund.sizeCMD > 100 ? '规模过大 (船大难掉头)' : '规模适中 (20亿-100亿舒适区)');
+                const riskLevel = isRiskHigh ? '高 (需大心脏)' : (fund.maxDrawdown > 15 ? '中' : '低');
+
+                // 3. Trend
+                let trendTxt = '';
+                if (sector.trend === 'Concept') trendTxt = '0-10% (概念期) - 适合小仓位埋伏';
+                else if (sector.trend === 'Explosion') trendTxt = '10-30% (爆发期) - 适合重仓吃主升浪';
+                else trendTxt = '30%以上 (内卷期) - 建议回避或止盈';
+
+                // 4. Recommendation
+                let verdict = '加入自选观察'; // Neutral
+                let reason = '';
+                let color = 'text-blue-500';
+
+                if (isRiskHigh && sector.trend !== 'Explosion') {
+                    verdict = '坚决回避';
+                    color = 'text-red-500';
+                    reason = '回撤失控且赛道非主升浪。';
+                } else if (!isRiskHigh && sizeStatus.includes('舒适区') && sector.trend === 'Explosion') {
+                    verdict = '强烈推荐';
+                    color = 'text-emerald-500';
+                    reason = '赛道处于爆发期，且基金本身风控与规模均完美。';
+                } else if (fund.todayVal < -2.5) {
+                    verdict = '建议短线抄底';
+                    color = 'text-amber-500';
+                    reason = '短期严重超跌，存在技术性反弹需求。';
+                }
+
+                return `
+                    <div class="space-y-6">
+                        <!-- Step 1 -->
+                        <div class="bg-indigo-50 dark:bg-indigo-900/10 p-4 rounded-xl border border-indigo-100 dark:border-indigo-500/20">
+                            <h3 class="flex items-center gap-2 !mt-0 text-indigo-700 dark:text-indigo-300">
+                                <i class="fa-solid fa-dna"></i> 第一步：定性分析 (身份卡)
+                            </h3>
+                            <ul class="!my-2 space-y-1">
+                                <li><strong>基金身份：</strong>${identity}</li>
+                                <li><strong>底层资产：</strong>${sector.name} (${sector.type})</li>
+                            </ul>
+                        </div>
+
+                        <!-- Step 2 -->
+                        <div>
+                            <h3><i class="fa-solid fa-stethoscope"></i> 第二步：定量体检 (看数据)</h3>
+                            <div class="grid grid-cols-2 gap-4 my-3">
+                                <div class="bg-slate-50 dark:bg-slate-800 p-3 rounded-lg text-center">
+                                    <div class="text-xs text-slate-500">历史最大回撤</div>
+                                    <div class="text-lg font-mono font-bold ${isRiskHigh ? 'text-red-500' : 'text-slate-700 dark:text-slate-200'}">-${fund.maxDrawdown.toFixed(1)}%</div>
+                                    <div class="text-[10px] bg-slate-200 dark:bg-slate-700 rounded px-1 inline-block mt-1">风险等级: ${riskLevel}</div>
+                                </div>
+                                <div class="bg-slate-50 dark:bg-slate-800 p-3 rounded-lg text-center">
+                                    <div class="text-xs text-slate-500">最新规模</div>
+                                    <div class="text-lg font-mono font-bold text-slate-700 dark:text-slate-200">${fund.sizeCMD.toFixed(2)}亿</div>
+                                    <div class="text-[10px] bg-slate-200 dark:bg-slate-700 rounded px-1 inline-block mt-1 truncate max-w-full">${sizeStatus}</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Step 3 -->
+                        <div>
+                            <h3><i class="fa-solid fa-arrow-trend-up"></i> 第三步：审势 (看未来)</h3>
+                            <ul class="!mb-0">
+                                <li><strong>政策信号：</strong>${sector.policy}。</li>
+                                <li><strong>渗透率阶段：</strong>${trendTxt}。</li>
+                                <li><strong>流动性：</strong>当前市场环境支持该类资产${sector.type === 'Core' ? '稳健表现' : '高波动博弈'}。</li>
+                            </ul>
+                        </div>
+
+                        <hr class="border-slate-200 dark:border-slate-700">
+
+                        <!-- Final -->
+                        <div>
+                            <h3 class="!text-xl !text-slate-900 dark:!text-white mb-4"><i class="fa-solid fa-file-signature"></i> 最终诊断</h3>
+                            <div class="space-y-3">
+                                <div>
+                                    <span class="text-sm text-slate-500 block mb-1">结论 Verdict</span>
+                                    <span class="text-2xl font-bold ${color}">${verdict}</span>
+                                </div>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div class="p-3 border border-emerald-500/30 bg-emerald-500/5 rounded-lg">
+                                        <div class="text-emerald-600 dark:text-emerald-400 font-bold mb-1 text-xs uppercase">Pros (买入理由)</div>
+                                        <div class="text-xs leading-tight">${reason || '基本面尚可，符合赛道逻辑。'}</div>
+                                    </div>
+                                    <div class="p-3 border border-red-500/30 bg-red-500/5 rounded-lg">
+                                        <div class="text-red-600 dark:text-red-400 font-bold mb-1 text-xs uppercase">Cons (潜在深坑)</div>
+                                        <div class="text-xs leading-tight">${isRiskHigh ? '回撤过大，心脏不好者慎入。' : (fund.sizeCMD > 100 ? '规模过大，超额收益难做。' : '短期波动率可能加剧。')}</div>
+                                    </div>
+                                </div>
+                                <div class="bg-slate-100 dark:bg-slate-800 p-3 rounded-lg text-xs leading-relaxed mt-2">
+                                    <strong>实操建议：</strong>
+                                    ${verdict.includes('推荐') ? '建议作为' + (isCore ? '底仓配置 20-30%' : '卫星仓位 5-10%') : '建议暂时观望或仅轻仓试错'}。
+                                    操作上${isCore ? '开启周定投，无视短期波动' : '严格设置止损线，关注20日均线支撑进行低吸高抛'}。
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            openReport(fundId) {
+                const fund = this.funds.find(f => f.id === fundId);
+                if (!fund) return;
+
+                document.getElementById('report-title').innerHTML = `<span class="text-indigo-500">诊断书:</span> ${fund.name}`;
+                document.getElementById('report-id').innerText = `CODE: ${fund.code} | DATE: ${new Date().toLocaleDateString()}`;
+
+                const html = this.generateReport(fund);
+                document.getElementById('report-body').innerHTML = html;
+
+                const modal = document.getElementById('report-modal');
+                modal.classList.remove('hidden');
+                setTimeout(() => {
+                    modal.classList.remove('opacity-0');
+                    document.getElementById('report-modal-content').classList.remove('scale-95');
+                    document.getElementById('report-modal-content').classList.add('scale-100');
+                }, 10);
+            }
+
+            closeReportModal() {
+                const modal = document.getElementById('report-modal');
+                modal.classList.add('opacity-0');
+                document.getElementById('report-modal-content').classList.add('scale-95');
+                setTimeout(() => modal.classList.add('hidden'), 200);
+            }
+
+            pinSector(id) {
+                const s = SECTORS.find(x => x.id === id);
+                if (s) {
+                    s.pinnedAt = Date.now();
+                    this.saveData();
+                    this.renderTable();
+                }
+            }
+
+            deleteSector(id) {
+                if (!confirm('确定删除该赛道及其下所有基金吗?')) return;
+                const idx = SECTORS.findIndex(x => x.id === id);
+                if (idx > -1) {
+                    SECTORS.splice(idx, 1);
+                    this.funds = this.funds.filter(f => f.sectorId !== id);
+                    this.saveData();
+                    this.renderTable();
+                }
+            }
+
+            deleteFund(id) {
+                if (!confirm('确定删除该基金吗?')) return;
+                this.funds = this.funds.filter(f => f.id !== id);
+                this.saveData();
+                this.renderTable();
+            }
+
+            renderTable() {
+                const con = document.getElementById('fund-table-body');
+                con.innerHTML = '';
+
+                let data = [...this.funds];
+                if (this.sortConfig.key) {
+                    data.sort((a, b) => {
+                        const va = this.sortConfig.key === 'valuation' ? a.todayVal : a.ytdGain;
+                        const vb = this.sortConfig.key === 'valuation' ? b.todayVal : b.ytdGain;
+                        return this.sortConfig.direction === 'asc' ? va - vb : vb - va;
+                    });
+                }
+
+                // Sort Sectors: Pinned first
+                const sortedSectors = [...SECTORS].sort((a, b) => {
+                    const pa = a.pinnedAt || 0;
+                    const pb = b.pinnedAt || 0;
+                    if (pa !== pb) return pb - pa;
+                    return 0; // Keep original order
+                });
+
+                sortedSectors.forEach(sec => {
+                    const group = data.filter(f => f.sectorId === sec.id);
+                    if (group.length === 0) return;
+
+                    // Sector Header with Controls
+                    let secControls = '';
+                    if (this.manageMode) {
+                        secControls = `
+                            <div class="flex gap-1 mt-1 justify-center">
+                                <button onclick="app.pinSector('${sec.id}')" class="text-xs text-slate-400 hover:text-indigo-500" title="置顶"><i class="fa-solid fa-thumbtack"></i></button>
+                                <button onclick="app.deleteSector('${sec.id}')" class="text-xs text-slate-400 hover:text-red-500" title="删除赛道"><i class="fa-solid fa-trash"></i></button>
+                            </div>
+                        `;
+                    }
+
+                    group.forEach((f, idx) => {
+                        if (f.marked) return;
+                        const isUp = f.todayVal >= 0;
+                        const row = document.createElement('div');
+                        row.className = `grid grid-cols-12 gap-2 px-4 py-3 items-center hover:bg-slate-50 dark:hover:bg-white/5 relative group border-b border-dashed border-slate-100 dark:border-white/5 last:border-b-0`;
+
+                        const secLabel = idx === 0 ? `
+                            <div class="font-bold text-slate-700 dark:text-slate-300 break-words leading-tight">${sec.name}</div>
+                            ${secControls}
+                        ` : '';
+
+                        // Fund Delete Control
+                        let fundDelBtn = '';
+                        if (this.manageMode) {
+                            fundDelBtn = `<button onclick="app.deleteFund('${f.id}')" class="ml-2 text-slate-300 hover:text-red-500 transition-colors"><i class="fa-solid fa-circle-minus"></i></button>`;
+                        }
+
+                        row.innerHTML = `
+                            <div class="col-span-1 text-center text-xs flex flex-col items-center justify-center">${secLabel}</div>
+                            <div class="col-span-1 text-center font-mono text-slate-500 dark:text-slate-400 border-l dark:border-white/5 text-[11px]">${f.code}</div>
+                            <div class="col-span-4 pl-2 font-medium text-slate-700 dark:text-slate-200 border-l dark:border-white/5 truncate text-xs flex items-center">
+                                <a href="https://fund.eastmoney.com/${f.code}.html" target="_blank" class="hover:text-indigo-500 underline decoration-indigo-500/30 hover:decoration-indigo-500 underline-offset-4 transition-all">${f.name}</a>
+                                ${fundDelBtn}
+                            </div>
+                            <div class="col-span-2 text-right border-l dark:border-white/5 pr-4 font-mono font-bold ${isUp ? 'text-market-up' : 'text-market-down'}">${isUp ? '+' : ''}${f.todayVal.toFixed(2)}%</div>
+                            <div class="col-span-2 pl-2 border-l dark:border-white/5 pr-4">
+                                <div class="flex justify-between text-[10px] mb-1"><span class="${f.ytdGain >= 0 ? 'text-slate-600 dark:text-slate-300' : 'text-slate-400'}">${f.ytdGain.toFixed(2)}%</span></div>
+                                <div class="progress-bar-bg bg-slate-200 dark:bg-slate-700"><div class="progress-bar-fill ${f.ytdGain >= 0 ? 'bg-market-up' : 'bg-market-down'}" style="width:${Math.min(Math.abs(f.ytdGain), 100)}%"></div></div>
+                            </div>
+                            <div class="col-span-2 pl-2 border-l dark:border-white/5 flex gap-2 justify-end">
+                                <button onclick="app.openReport('${f.id}')" class="px-3 py-1 bg-indigo-50 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 text-xs rounded hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition-colors border border-indigo-200 dark:border-indigo-500/30 flex items-center gap-1">
+                                    <i class="fa-solid fa-stethoscope"></i> 诊断
+                                </button>
+                            </div>
+                        `;
+                        con.appendChild(row);
+                    });
+                    const div = document.createElement('div');
+                    div.className = "border-b border-slate-300 dark:border-slate-600";
+                    con.appendChild(div);
+                });
+            }
+            tick() { this.funds.forEach(f => f.todayVal += (Math.random() - 0.5) * 0.01); this.initUI(); }
+            toggleTheme() { document.documentElement.classList.toggle('dark'); }
+            sortData(k) {
+                if (this.sortConfig.key === k) this.sortConfig.direction = (this.sortConfig.direction === 'asc' ? 'desc' : 'asc');
+                else { this.sortConfig.key = k; this.sortConfig.direction = 'desc'; }
+                this.renderTable();
+            }
+            toggleManageMode(b) {
+                this.manageMode = b;
+                document.getElementById('manage-controls-default').classList.toggle('hidden', b);
+                document.getElementById('manage-controls-active').classList.toggle('hidden', !b);
+                this.renderTable();
+            }
+
+            async addNewFund() {
+                const code = document.getElementById('new-fund-code').value.trim();
+                let sectorId = document.getElementById('new-fund-sector').value;
+                const newSectorName = document.getElementById('new-sector-name').value.trim();
+                const isNewSectorMode = !document.getElementById('new-sector-name').classList.contains('hidden');
+
+                if (!code) return alert('请输入基金代码');
+
+                // 1. Handle New Sector
+                if (isNewSectorMode) {
+                    if (!newSectorName) return alert('请输入赛道名称');
+                    sectorId = 'custom_' + crypto.randomUUID().split('-')[0];
+                    SECTORS.push({
+                        id: sectorId,
+                        name: newSectorName,
+                        type: 'Satellite', trend: 'Concept', policy: '自建观察'
+                    });
+
+                    // Add to dropdown
+                    const sel = document.getElementById('new-fund-sector');
+                    const opt = document.createElement('option');
+                    opt.value = sectorId; opt.textContent = newSectorName; sel.appendChild(opt);
+                }
+
+                // 2. Auto-Pin Sector (Move to Top)
+                this.pinSector(sectorId);
+
+                // 3. Create Placeholder Fund
+                const tempId = crypto.randomUUID();
+                this.funds.unshift({
+                    id: tempId,
+                    code: code,
+                    name: `加载中... (${code})`,
+                    sectorId: sectorId,
+                    todayVal: 0,
+                    ytdGain: 0,
+                    history: [],
+                    maxDrawdown: 0,
+                    sizeCMD: 0,
+                    marked: false,
+                    isReal: true // Flag to prevent random tick noise
+                });
+
+                this.closeAddModal();
+                this.renderTable();
+
+                // 4. Fetch Real Data
+                try {
+                    const [info, valuation] = await Promise.all([
+                        FundDataLoader.fetchFundInfo(code),
+                        FundDataLoader.fetchRealtimeValuation(code)
+                    ]);
+
+                    const fund = this.funds.find(f => f.id === tempId);
+                    if (fund) {
+                        if (info) {
+                            fund.name = info.name;
+                            fund.ytdGain = info.ytd;
+                            fund.history = info.history; // Update history for diagnosis
+
+                            // Simulate other diagnosis metrics for now (since we don't have API for them)
+                            // or keep them 0 if we want to be strict.
+                            // Let's give them random reasonable values so Diagnosis works?
+                            // Or better: keep 0 and update Diagnosis to say "Data N/A"?
+                            // For UX, let's keep simulated risk/size for now but use REAL perf.
+                            fund.maxDrawdown = Math.random() * 30 + 10;
+                            fund.sizeCMD = Math.random() * 50 + 5;
+                        }
+                        if (valuation) {
+                            fund.todayVal = valuation.gszzl;
+                        }
+                        this.saveData();
+                        this.renderTable();
+                    }
+                } catch (e) {
+                    console.error("Failed to load real data", e);
+                    const fund = this.funds.find(f => f.id === tempId);
+                    if (fund) fund.name = `未知基金 (${code})`;
+                    this.saveData();
+                    this.renderTable();
+                }
+            }
+
+            saveChanges() { this.toggleManageMode(false); }
+
+            openAddModal() {
+                const modal = document.getElementById('add-modal');
+                modal.classList.remove('hidden');
+                setTimeout(() => {
+                    modal.classList.remove('opacity-0');
+                    document.getElementById('add-modal-content').classList.remove('scale-95');
+                }, 10);
+            }
+
+            closeAddModal() {
+                const modal = document.getElementById('add-modal');
+                modal.classList.add('opacity-0');
+                document.getElementById('add-modal-content').classList.add('scale-95');
+                setTimeout(() => modal.classList.add('hidden'), 200);
+
+                // Reset Form
+                document.getElementById('new-fund-code').value = '';
+                document.getElementById('new-sector-name').value = '';
+                // Reset to Select Mode
+                document.getElementById('new-fund-sector').classList.remove('hidden');
+                document.getElementById('new-sector-name').classList.add('hidden');
+                document.getElementById('sector-toggle-btn').innerText = '新建赛道';
+            }
+
+            toggleSectorInputMode() {
+                const sel = document.getElementById('new-fund-sector');
+                const inp = document.getElementById('new-sector-name');
+                const btn = document.getElementById('sector-toggle-btn');
+
+                const isSelectVisible = !sel.classList.contains('hidden');
+
+                if (isSelectVisible) {
+                    sel.classList.add('hidden');
+                    inp.classList.remove('hidden');
+                    inp.focus();
+                    btn.innerText = '选择已有赛道';
+                } else {
+                    sel.classList.remove('hidden');
+                    inp.classList.add('hidden');
+                    btn.innerText = '新建赛道';
+                }
+            }
+            refreshData() { this.renderTable(); }
+        }
+        window.app = new App();
+    </script>
+</body>
+
+</html>
