@@ -406,7 +406,7 @@
                 // 1. Fetch Basic Info & History (pingzhongdata)
                 // This defines globals: fS_name, Data_netWorthTrend, etc.
                 try {
-                    await this.loadScript(`http://fund.eastmoney.com/pingzhongdata/${code}.js`);
+                    await this.loadScript(`https://fund.eastmoney.com/pingzhongdata/${code}.js`);
 
                     if (typeof fS_name === 'undefined') throw new Error('Data not found');
 
@@ -453,7 +453,7 @@
                         delete window.jsonpgz; // Cleanup
                     };
 
-                    this.loadScript(`http://fundgz.1234567.com.cn/js/${code}.js?rt=${Date.now()}`)
+                    this.loadScript(`https://fundgz.1234567.com.cn/js/${code}.js?rt=${Date.now()}`)
                         .catch(() => resolve(null)); // Resolve null on error
                 });
             }
